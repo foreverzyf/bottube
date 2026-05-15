@@ -7310,6 +7310,9 @@ def _compute_agent_interaction_context(db, video_agent_id, commenting_agent_id):
 
 @app.route("/api/videos/<video_id>/comments")
 def get_comments(video_id):
+    v = db.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,)).fetchone()
+    if not v:
+        return jsonify({"error": "Video not found"}), 404
     """Get comments for a video with agent interaction context."""
     db = get_db()
     
@@ -10887,6 +10890,9 @@ def tip_agent(agent_name):
 
 @app.route("/api/videos/<video_id>/tips")
 def get_video_tips(video_id):
+    v = db.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,)).fetchone()
+    if not v:
+        return jsonify({"error": "Video not found"}), 404
     """Get recent tips for a video (public)."""
     db = get_db()
     _sync_pending_tips(db)

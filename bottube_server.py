@@ -7876,10 +7876,15 @@ def web_subscribe(agent_name):
     """Toggle subscription from the web UI (requires login session)."""
     if not g.user:
         return jsonify({"error": "You must be signed in to follow.", "login_required": True}), 401
+    if g.user["is_banned"]:
+        return jsonify({"error": "Account banned", "reason": g.user["ban_reason"] or ""}), 403
     _verify_csrf()
 
     db = get_db()
-    target = db.execute("SELECT id, agent_name FROM agents WHERE agent_name = ?", (agent_name,)).fetchone()
+    target = db.execute(
+        "SELECT id, agent_name FROM agents WHERE agent_name = ? AND COALESCE(is_banned, 0) = 0",
+        (agent_name,),
+    ).fetchone()
     if not target:
         return jsonify({"error": "Agent not found"}), 404
     if target["id"] == g.user["id"]:
@@ -7909,7 +7914,10 @@ def web_subscribe(agent_name):
         following = True
 
     count = db.execute(
-        "SELECT COUNT(*) FROM subscriptions WHERE following_id = ?", (target["id"],)
+        """SELECT COUNT(*)
+           FROM subscriptions s JOIN agents a ON s.follower_id = a.id
+           WHERE s.following_id = ? AND COALESCE(a.is_banned, 0) = 0""",
+        (target["id"],),
     ).fetchone()[0]
 
     return jsonify({"ok": True, "following": following, "subscriber_count": count})
@@ -9734,7 +9742,8 @@ def subscribe_agent(agent_name):
     """Follow another agent."""
     db = get_db()
     target = db.execute(
-        "SELECT id, agent_name FROM agents WHERE agent_name = ?", (agent_name,)
+        "SELECT id, agent_name FROM agents WHERE agent_name = ? AND COALESCE(is_banned, 0) = 0",
+        (agent_name,),
     ).fetchone()
     if not target:
         return jsonify({"error": "Agent not found"}), 404
@@ -9759,7 +9768,10 @@ def subscribe_agent(agent_name):
     db.commit()
 
     count = db.execute(
-        "SELECT COUNT(*) FROM subscriptions WHERE following_id = ?", (target["id"],)
+        """SELECT COUNT(*)
+           FROM subscriptions s JOIN agents a ON s.follower_id = a.id
+           WHERE s.following_id = ? AND COALESCE(a.is_banned, 0) = 0""",
+        (target["id"],),
     ).fetchone()[0]
     return jsonify({"ok": True, "following": True, "agent": agent_name, "follower_count": count})
 
@@ -9792,6 +9804,7 @@ def my_subscriptions():
         """SELECT a.agent_name, a.display_name, a.is_human, a.avatar_url, s.created_at
            FROM subscriptions s JOIN agents a ON s.following_id = a.id
            WHERE s.follower_id = ?
+             AND COALESCE(a.is_banned, 0) = 0
            ORDER BY s.created_at DESC""",
         (g.agent["id"],),
     ).fetchall()
@@ -9810,7 +9823,10 @@ def my_subscriptions():
 def agent_subscribers(agent_name):
     """List followers of an agent (public)."""
     db = get_db()
-    target = db.execute("SELECT id FROM agents WHERE agent_name = ?", (agent_name,)).fetchone()
+    target = db.execute(
+        "SELECT id FROM agents WHERE agent_name = ? AND COALESCE(is_banned, 0) = 0",
+        (agent_name,),
+    ).fetchone()
     if not target:
         return jsonify({"error": "Agent not found"}), 404
 
@@ -9818,6 +9834,7 @@ def agent_subscribers(agent_name):
         """SELECT a.agent_name, a.display_name, a.is_human, a.avatar_url
            FROM subscriptions s JOIN agents a ON s.follower_id = a.id
            WHERE s.following_id = ?
+             AND COALESCE(a.is_banned, 0) = 0
            ORDER BY s.created_at DESC""",
         (target["id"],),
     ).fetchall()
@@ -9841,15 +9858,24 @@ def subscription_feed():
 
     db = get_db()
     total = db.execute(
-        """SELECT COUNT(*) FROM videos v
-           WHERE v.agent_id IN (SELECT following_id FROM subscriptions WHERE follower_id = ?)""",
+        """SELECT COUNT(*)
+           FROM videos v
+           JOIN agents a ON v.agent_id = a.id
+           JOIN subscriptions s ON s.following_id = v.agent_id
+           WHERE s.follower_id = ?
+             AND COALESCE(v.is_removed, 0) = 0
+             AND COALESCE(a.is_banned, 0) = 0""",
         (g.agent["id"],),
     ).fetchone()[0]
 
     rows = db.execute(
         """SELECT v.*, a.agent_name, a.display_name, a.is_human
-           FROM videos v JOIN agents a ON v.agent_id = a.id
-           WHERE v.agent_id IN (SELECT following_id FROM subscriptions WHERE follower_id = ?)
+           FROM videos v
+           JOIN agents a ON v.agent_id = a.id
+           JOIN subscriptions s ON s.following_id = v.agent_id
+           WHERE s.follower_id = ?
+             AND COALESCE(v.is_removed, 0) = 0
+             AND COALESCE(a.is_banned, 0) = 0
            ORDER BY v.created_at DESC LIMIT ? OFFSET ?""",
         (g.agent["id"], per_page, offset),
     ).fetchall()

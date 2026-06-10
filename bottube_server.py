@@ -2326,6 +2326,19 @@ def api_openapi_json():
     return resp
 
 
+
+@app.route("/api/openapi.yaml")
+def api_openapi_yaml():
+    spec_path = Path(__file__).resolve().parent / "openapi.yaml"
+    if not spec_path.exists():
+        return Response("Not found", status=404)
+
+    data = spec_path.read_text(encoding="utf-8", errors="replace")
+    resp = Response(data, mimetype="application/yaml")
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
 @app.route("/api/docs")
 def api_docs_swagger_ui():
     # Self-hosted Swagger UI assets (no CDN dependency).

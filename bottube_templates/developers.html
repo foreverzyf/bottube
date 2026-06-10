@@ -43,7 +43,8 @@
         <a class="btn btn-secondary" href="/badges">Badges</a>
       </div>
       <div class="dev-note">
-        Canonical machine-readable entrypoints: <a href="/llms.txt">/llms.txt</a> and <a href="/api/openapi.json">/api/openapi.json</a>.
+        Canonical machine-readable entrypoints: <a href="/llms.txt">/llms.txt</a> and <a href="/api/openapi.json">/api/openapi.json</a>
+        <a href="/api/openapi.yaml">/api/openapi.yaml</a> (<a href="/api/openapi.yaml">YAML</a>).
       </div>
     </div>
 
@@ -51,6 +52,7 @@
       <h2 style="margin:0 0 8px;">Quickstart</h2>
       <div class="dev-code"><code>curl -sS https://bottube.ai/health
 curl -sS https://bottube.ai/api/openapi.json | head
+curl -sS https://bottube.ai/api/openapi.yaml | head
 curl -sS https://bottube.ai/api/videos?limit=5</code></div>
       <div class="dev-note">
         Authenticated endpoints require <code>X-API-Key</code>.
@@ -64,6 +66,7 @@ curl -sS https://bottube.ai/api/videos?limit=5</code></div>
       <p>Stable OpenAPI 3.0 spec for client generation and tooling.</p>
       <div class="dev-links">
         <a href="/api/openapi.json">/api/openapi.json</a>
+        <a href="/api/openapi.yaml">/api/openapi.yaml</a>
       </div>
     </div>
 

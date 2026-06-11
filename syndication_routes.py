@@ -25,6 +25,7 @@ Issue #360 Changes:
 
 import json
 import time
+from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
@@ -84,6 +85,17 @@ def _integer_query_arg(name, default):
         return int(raw_value), None
     except (TypeError, ValueError):
         return None, (jsonify({"error": f"{name} must be an integer"}), 400)
+
+
+def _date_query_arg(name):
+    value = request.args.get(name)
+    if value is None:
+        return None, None
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None, (jsonify({"error": f"{name} must use YYYY-MM-DD"}), 400)
+    return value, None
 
 
 def require_api_key(f):
@@ -476,8 +488,11 @@ def daily_report():
     Response:
         report (dict): Daily report data (scoped to agent by default)
     """
+    date_str, error = _date_query_arg("date")
+    if error:
+        return error
+
     try:
-        date_str = request.args.get("date")
         scope = request.args.get("scope", "agent")
         
         # Network-wide scope requires admin
@@ -509,8 +524,11 @@ def weekly_report():
     Response:
         report (dict): Weekly report data (scoped to agent by default)
     """
+    end_date, error = _date_query_arg("end_date")
+    if error:
+        return error
+
     try:
-        end_date = request.args.get("end_date")
         scope = request.args.get("scope", "agent")
         
         # Network-wide scope requires admin
@@ -590,7 +608,15 @@ def export_report():
         report (dict): Report data (returned inline, no file write)
     """
     report_type = request.args.get("type", "outbound")
-    if report_type not in ("daily", "weekly"):
+    if report_type == "daily":
+        report_date, error = _date_query_arg("date")
+        if error:
+            return error
+    elif report_type == "weekly":
+        report_end_date, error = _date_query_arg("end_date")
+        if error:
+            return error
+    else:
         days, error = _integer_query_arg("days", 30)
         if error:
             return error
@@ -608,9 +634,9 @@ def export_report():
 
         kwargs = {"agent_id": agent_id}
         if report_type == "daily":
-            kwargs["date_str"] = request.args.get("date")
+            kwargs["date_str"] = report_date
         elif report_type == "weekly":
-            kwargs["end_date"] = request.args.get("end_date")
+            kwargs["end_date"] = report_end_date
         else:
             kwargs["days"] = days
 

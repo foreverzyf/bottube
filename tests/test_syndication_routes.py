@@ -206,3 +206,24 @@ def test_numeric_query_params_reject_malformed_values(client, path):
 
     assert resp.status_code == 400
     assert resp.get_json()["error"].endswith("must be an integer")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/syndication/report/daily?date=not-a-date",
+        "/api/syndication/report/weekly?end_date=not-a-date",
+        "/api/syndication/report/export?type=daily&date=not-a-date",
+        "/api/syndication/report/export?type=weekly&end_date=not-a-date",
+    ],
+)
+def test_report_routes_reject_malformed_dates(client, path):
+    _insert_agent("datebot", "bottube_sk_datebot")
+
+    resp = client.get(
+        path,
+        headers={"X-API-Key": "bottube_sk_datebot"},
+    )
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"].endswith("must use YYYY-MM-DD")
